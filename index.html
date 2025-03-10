@@ -71,7 +71,7 @@
             left: 50%;
             transform: translateX(-50%);
             font-family: 'Annie Use Your Telescope', cursive; /* Fuente estilo grafiti */
-            font-size: clamp(27.6px, 5.75vw, 46px); /* 15% más grande (24 * 1.15, 40 * 1.15) */
+            font-size: clamp(27.6px, 5.75vw, 46px); /* 15% más grande que antes */
             color: yellow;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7), /* Sombra para efecto grafiti */
                         -2px -2px 4px rgba(0, 0, 0, 0.5);
@@ -136,8 +136,13 @@
             canvas.height = newHeight;
             scaleFactor = canvas.width / BASE_WIDTH_MOBILE;
 
-            // Posicionar el título a la mitad del margen superior (7.5% desde el borde superior)
-            gameTitle.style.top = '7.5vh'; // Mitad del 15% de margen superior
+            // Calcular el margen superior disponible (15% del alto de la ventana)
+            const topMarginHeight = window.innerHeight * 0.15;
+            // Obtener la altura del título
+            const titleHeight = gameTitle.offsetHeight;
+            // Centrar el título verticalmente dentro del margen (15% - altura del título) / 2
+            const topPosition = (topMarginHeight - titleHeight) / 2;
+            gameTitle.style.top = `${topPosition}px`;
         } else {
             // Estilo para computadoras: tamaño fijo 10% más grande
             gameContainer.style.width = `${BASE_WIDTH_DESKTOP}px`;
@@ -322,7 +327,7 @@
         drawPlane();
 
         frameCount++;
-        if (frameCount % 95 === 0) {
+        if (frameCount % 101 === 0) {
             createPencil();
         }
 
