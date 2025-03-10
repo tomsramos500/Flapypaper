@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Paper Plane Game</title>
+    <title>Flapypaper</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Annie+Use+Your+Telescope&display=swap" rel="stylesheet">
     <style>
         body {
             background: #f0f0f0;
+            margin: 0;
+            padding: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            min-height: 100vh;
             font-family: Arial, sans-serif;
+            overflow: hidden;
+            touch-action: none;
         }
         #gameContainer {
             position: relative;
@@ -25,7 +30,7 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            font-size: 24px;
+            font-size: clamp(16px, 4vw, 24px);
             color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
             z-index: 10;
@@ -41,221 +46,323 @@
             border-radius: 10px;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
             display: none;
+            width: 70%;
+            max-width: 300px;
+        }
+        #gameOverScreen h2 {
+            font-size: clamp(20px, 5vw, 32px);
+            margin: 10px 0;
+        }
+        #gameOverScreen p {
+            font-size: clamp(14px, 3vw, 18px);
+            margin: 5px 0;
+        }
+        #gameOverScreen button {
+            padding: clamp(8px, 2vw, 10px) clamp(15px, 3vw, 20px);
+            font-size: clamp(12px, 3vw, 16px);
+            cursor: pointer;
+            border: none;
+            background: #333;
+            color: white;
+            border-radius: 5px;
+        }
+        #gameTitle {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Annie Use Your Telescope', cursive; /* Fuente estilo grafiti */
+            font-size: clamp(27.6px, 5.75vw, 46px); /* 15% más grande (24 * 1.15, 40 * 1.15) */
+            color: yellow;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7), /* Sombra para efecto grafiti */
+                        -2px -2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 20;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <canvas id="gameCanvas"></canvas>
         <div id="scoreDisplay">Score: 0<br>High Score: 0</div>
         <div id="gameOverScreen">
             <h2>Game Over</h2>
             <p id="finalScore">Score: 0</p>
             <p id="highScoreDisplay">High Score: 0</p>
-            <button onclick="location.reload()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">Play Again</button>
+            <button onclick="location.reload()">Play Again</button>
         </div>
     </div>
+    <div id="gameTitle">Flapypaper</div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScore = document.getElementById('finalScore');
+    const highScoreDisplay = document.getElementById('highScoreDisplay');
+    const gameContainer = document.getElementById('gameContainer');
+    const gameTitle = document.getElementById('gameTitle');
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreDisplay = document.getElementById('scoreDisplay');
-        const gameOverScreen = document.getElementById('gameOverScreen');
-        const finalScore = document.getElementById('finalScore');
-        const highScoreDisplay = document.getElementById('highScoreDisplay');
+    // Configuración base
+    const BASE_WIDTH_DESKTOP = 440;  // 10% más grande que el original (400 * 1.1)
+    const BASE_HEIGHT_DESKTOP = 660; // 10% más grande que el original (600 * 1.1)
+    const BASE_WIDTH_MOBILE = 400;
+    const BASE_HEIGHT_MOBILE = 600;
+    let scaleFactor = 1;
 
-        let plane = {
-            x: 75,
-            y: 300,
-            width: 35,
-            height: 23,
-            velocity: 0,
-            gravity: 0.3,
-            lift: -6,
-            rotation: 0
-        };
+    // Detectar si es un dispositivo móvil
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-        let pencils = [];
-        let frameCount = 0;
-        const gap = 135; // Espacio entre las gomas (área segura)
-        let score = 0;
-        let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0; // Recuperar highScore desde localStorage
-        let gameOver = false;
+    function resizeCanvas() {
+        if (isMobile) {
+            // Estilo para móviles: 5% a los lados, 15% arriba/abajo
+            gameContainer.style.width = '90vw';
+            gameContainer.style.height = '70vh';
+            gameContainer.style.margin = '15vh auto 15vh auto';
 
-        // Mostrar el highScore inicial
+            const containerWidth = window.innerWidth * 0.9; // 90% del ancho
+            const containerHeight = window.innerHeight * 0.7; // 70% del alto
+            const aspectRatio = BASE_WIDTH_MOBILE / BASE_HEIGHT_MOBILE;
+
+            let newWidth = containerWidth;
+            let newHeight = newWidth / aspectRatio;
+
+            if (newHeight > containerHeight) {
+                newHeight = containerHeight;
+                newWidth = newHeight * aspectRatio;
+            }
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            scaleFactor = canvas.width / BASE_WIDTH_MOBILE;
+
+            // Posicionar el título a la mitad del margen superior (7.5% desde el borde superior)
+            gameTitle.style.top = '7.5vh'; // Mitad del 15% de margen superior
+        } else {
+            // Estilo para computadoras: tamaño fijo 10% más grande
+            gameContainer.style.width = `${BASE_WIDTH_DESKTOP}px`;
+            gameContainer.style.height = `${BASE_HEIGHT_DESKTOP}px`;
+            gameContainer.style.margin = '0 auto';
+
+            canvas.width = BASE_WIDTH_DESKTOP;
+            canvas.height = BASE_HEIGHT_DESKTOP;
+            scaleFactor = 1; // Sin escalado, tamaño fijo
+
+            // Posicionar el título a la mitad del margen superior (ajustado al lienzo)
+            gameTitle.style.top = `${(canvas.height * 0.025)}px`; // 2.5% del alto del lienzo
+        }
+
+        // Ajustar elementos del juego
+        plane.x = 75 * scaleFactor;
+        plane.y = (isMobile ? BASE_HEIGHT_MOBILE : BASE_HEIGHT_DESKTOP) * 0.5 * scaleFactor;
+        plane.width = 35 * scaleFactor;
+        plane.height = 23 * scaleFactor;
+        plane.gravity = 0.3 * scaleFactor;
+        plane.lift = -6 * scaleFactor;
+    }
+
+    let plane = {
+        x: 75,
+        y: 300,
+        width: 35,
+        height: 23,
+        velocity: 0,
+        gravity: 0.3,
+        lift: -6,
+        rotation: 0
+    };
+
+    let pencils = [];
+    let frameCount = 0;
+    const gap = 135; // Espacio entre las gomas (área segura)
+    let score = 0;
+    let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+    let gameOver = false;
+
+    scoreDisplay.innerHTML = `Score: ${score}<br>High Score: ${highScore}`;
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', resizeCanvas);
+    resizeCanvas();
+
+    function drawPlane() {
+        ctx.save();
+        ctx.translate(plane.x + plane.width/2, plane.y);
+        ctx.rotate(plane.rotation);
+
+        ctx.beginPath();
+        ctx.moveTo(plane.width/2, 0);
+        ctx.lineTo(-plane.width/2, -plane.height/2);
+        ctx.lineTo(-plane.width/4, 0);
+        ctx.lineTo(-plane.width/2, plane.height/2);
+        ctx.closePath();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2 * scaleFactor;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-plane.width/4, 0);
+        ctx.lineTo(plane.width/2 - 5 * scaleFactor, 0);
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1 * scaleFactor;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(-plane.width/2, -plane.height/4);
+        ctx.lineTo(-plane.width/2 - 10 * scaleFactor, -plane.height/4);
+        ctx.moveTo(-plane.width/2, 0);
+        ctx.lineTo(-plane.width/2 - 15 * scaleFactor, 0);
+        ctx.moveTo(-plane.width/2, plane.height/4);
+        ctx.lineTo(-plane.width/2 - 10 * scaleFactor, plane.height/4);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1 * scaleFactor;
+        ctx.stroke();
+
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        ctx.restore();
+    }
+
+    function drawPencil(pencil) {
+        const pencilWidth = 50 * scaleFactor;
+        const eraserHeight = 30 * scaleFactor;
+
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(pencil.x, 0, pencilWidth, pencil.top);
+        ctx.fillRect(pencil.x, pencil.top + gap * scaleFactor, pencilWidth, canvas.height - (pencil.top + gap * scaleFactor));
+
+        ctx.fillStyle = '#FF69B4';
+        ctx.fillRect(pencil.x, pencil.top - eraserHeight, pencilWidth, eraserHeight);
+        ctx.strokeStyle = '#C71585';
+        ctx.lineWidth = 1 * scaleFactor;
+        ctx.strokeRect(pencil.x, pencil.top - eraserHeight, pencilWidth, eraserHeight);
+
+        ctx.fillStyle = '#FF69B4';
+        ctx.fillRect(pencil.x, pencil.top + gap * scaleFactor, pencilWidth, eraserHeight);
+        ctx.strokeStyle = '#C71585';
+        ctx.lineWidth = 1 * scaleFactor;
+        ctx.strokeRect(pencil.x, pencil.top + gap * scaleFactor, pencilWidth, eraserHeight);
+
+        ctx.strokeStyle = '#D2691E';
+        ctx.lineWidth = 1 * scaleFactor;
+        for (let i = 0; i < pencilWidth; i += 10 * scaleFactor) {
+            ctx.beginPath();
+            ctx.moveTo(pencil.x + i, 0);
+            ctx.lineTo(pencil.x + i, pencil.top - eraserHeight);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(pencil.x + i, pencil.top + gap * scaleFactor + eraserHeight);
+            ctx.lineTo(pencil.x + i, canvas.height);
+            ctx.stroke();
+        }
+    }
+
+    function createPencil() {
+        let topHeight = Math.random() * (canvas.height - gap * scaleFactor - 40 * scaleFactor) + 20 * scaleFactor;
+        pencils.push({
+            x: canvas.width,
+            top: topHeight,
+            scored: false
+        });
+    }
+
+    function checkCollision() {
+        if (plane.y - plane.height/2 < 0 || plane.y + plane.height/2 > canvas.height) {
+            return true;
+        }
+
+        for (let pencil of pencils) {
+            const pencilWidth = 50 * scaleFactor;
+            if (plane.x + plane.width/2 > pencil.x && plane.x - plane.width/2 < pencil.x + pencilWidth) {
+                const eraserHeight = 30 * scaleFactor;
+                if (plane.y - plane.height/2 < pencil.top) {
+                    return true;
+                }
+                if (plane.y - plane.height/2 < pencil.top && plane.y + plane.height/2 > pencil.top - eraserHeight) {
+                    return true;
+                }
+                if (plane.y - plane.height/2 < pencil.top + gap * scaleFactor + eraserHeight && plane.y + plane.height/2 > pencil.top + gap * scaleFactor) {
+                    return true;
+                }
+                if (plane.y + plane.height/2 > pencil.top + gap * scaleFactor + eraserHeight) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function update() {
+        if (gameOver) {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+            }
+            gameOverScreen.style.display = 'block';
+            finalScore.textContent = 'Score: ' + score;
+            highScoreDisplay.textContent = 'High Score: ' + highScore;
+            return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        plane.velocity += plane.gravity;
+        plane.y += plane.velocity;
+        plane.rotation = Math.min(Math.max(plane.velocity * 0.05, -0.5), 0.5);
+        drawPlane();
+
+        frameCount++;
+        if (frameCount % 95 === 0) {
+            createPencil();
+        }
+
+        for (let i = pencils.length - 1; i >= 0; i--) {
+            pencils[i].x -= 2 * scaleFactor;
+            drawPencil(pencils[i]);
+
+            if (pencils[i].x + 50 * scaleFactor < plane.x && !pencils[i].scored) {
+                score++;
+                pencils[i].scored = true;
+            }
+
+            if (pencils[i].x < -50 * scaleFactor) {
+                pencils.splice(i, 1);
+            }
+        }
+
         scoreDisplay.innerHTML = `Score: ${score}<br>High Score: ${highScore}`;
 
-        // Paper plane design
-        function drawPlane() {
-            ctx.save();
-            ctx.translate(plane.x + plane.width/2, plane.y);
-            ctx.rotate(plane.rotation);
-
-            ctx.beginPath();
-            ctx.moveTo(plane.width/2, 0);
-            ctx.lineTo(-plane.width/2, -plane.height/2);
-            ctx.lineTo(-plane.width/4, 0);
-            ctx.lineTo(-plane.width/2, plane.height/2);
-            ctx.closePath();
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fill();
-
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(-plane.width/4, 0);
-            ctx.lineTo(plane.width/2 - 5, 0);
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(-plane.width/2, -plane.height/4);
-            ctx.lineTo(-plane.width/2 - 10, -plane.height/4);
-            ctx.moveTo(-plane.width/2, 0);
-            ctx.lineTo(-plane.width/2 - 15, 0);
-            ctx.moveTo(-plane.width/2, plane.height/4);
-            ctx.lineTo(-plane.width/2 - 10, plane.height/4);
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.shadowBlur = 5;
-            ctx.shadowColor = 'rgba(0,0,0,0.3)';
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-
-            ctx.restore();
+        if (checkCollision()) {
+            gameOver = true;
         }
 
-        // Pencil design with erasers as solid obstacles
-        function drawPencil(pencil) {
-            ctx.fillStyle = '#FFD700';
-            ctx.fillRect(pencil.x, 0, 50, pencil.top);
-            
-            ctx.fillStyle = '#FFD700';
-            ctx.fillRect(pencil.x, pencil.top + gap, 50, canvas.height - (pencil.top + gap));
-            
-            ctx.fillStyle = '#FF69B4';
-            ctx.fillRect(pencil.x, pencil.top - 30, 50, 30);
-            ctx.strokeStyle = '#C71585';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(pencil.x, pencil.top - 30, 50, 30);
+        requestAnimationFrame(update);
+    }
 
-            ctx.fillStyle = '#FF69B4';
-            ctx.fillRect(pencil.x, pencil.top + gap, 50, 30);
-            ctx.strokeStyle = '#C71585';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(pencil.x, pencil.top + gap, 50, 30);
-
-            ctx.strokeStyle = '#D2691E';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 50; i += 10) {
-                ctx.beginPath();
-                ctx.moveTo(pencil.x + i, 0);
-                ctx.lineTo(pencil.x + i, pencil.top - 30);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(pencil.x + i, pencil.top + gap + 30);
-                ctx.lineTo(pencil.x + i, canvas.height);
-                ctx.stroke();
-            }
+    function liftPlane(e) {
+        e.preventDefault();
+        if (!gameOver) {
+            plane.velocity = plane.lift;
         }
+    }
 
-        function createPencil() {
-            let topHeight = Math.random() * (canvas.height - gap - 40) + 20;
-            pencils.push({
-                x: canvas.width,
-                top: topHeight,
-                scored: false
-            });
-        }
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') liftPlane(e);
+    });
+    canvas.addEventListener('touchstart', liftPlane);
+    canvas.addEventListener('mousedown', liftPlane);
 
-        function checkCollision() {
-            if (plane.y - plane.height/2 < 0 || plane.y + plane.height/2 > canvas.height) {
-                return true;
-            }
-
-            for (let pencil of pencils) {
-                if (plane.x + plane.width/2 > pencil.x && plane.x - plane.width/2 < pencil.x + 50) {
-                    if (plane.y - plane.height/2 < pencil.top) {
-                        return true;
-                    }
-                    if (plane.y - plane.height/2 < pencil.top && plane.y + plane.height/2 > pencil.top - 30) {
-                        return true;
-                    }
-                    if (plane.y - plane.height/2 < pencil.top + gap + 30 && plane.y + plane.height/2 > pencil.top + gap) {
-                        return true;
-                    }
-                    if (plane.y + plane.height/2 > pencil.top + gap + 30) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function update() {
-            if (gameOver) {
-                // Actualizar highScore si el score actual es mayor
-                if (score > highScore) {
-                    highScore = score;
-                    localStorage.setItem('highScore', highScore); // Guardar en localStorage
-                }
-                gameOverScreen.style.display = 'block';
-                finalScore.textContent = 'Score: ' + score;
-                highScoreDisplay.textContent = 'High Score: ' + highScore;
-                return;
-            }
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            plane.velocity += plane.gravity;
-            plane.y += plane.velocity;
-            plane.rotation = Math.min(Math.max(plane.velocity * 0.05, -0.5), 0.5);
-            drawPlane();
-
-            frameCount++;
-            if (frameCount % 95 === 0) {
-                createPencil();
-            }
-
-            for (let i = pencils.length - 1; i >= 0; i--) {
-                pencils[i].x -= 2;
-                drawPencil(pencils[i]);
-
-                if (pencils[i].x + 50 < plane.x && !pencils[i].scored) {
-                    score++;
-                    pencils[i].scored = true;
-                }
-
-                if (pencils[i].x < -50) {
-                    pencils.splice(i, 1);
-                }
-            }
-
-            scoreDisplay.innerHTML = `Score: ${score}<br>High Score: ${highScore}`;
-
-            if (checkCollision()) {
-                gameOver = true;
-            }
-
-            requestAnimationFrame(update);
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                plane.velocity = plane.lift;
-            }
-        });
-
-        update();
-    </script>
+    update();
+</script>
 </body>
 </html>
